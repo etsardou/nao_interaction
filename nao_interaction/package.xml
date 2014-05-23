@@ -27,5 +27,6 @@
   <run_depend>nao_interaction_launchers</run_depend>
   <run_depend>nao_audio</run_depend>
   <run_depend>nao_vision</run_depend>
+  <run_depend>nao_connection</run_depend>
 
 </package>
