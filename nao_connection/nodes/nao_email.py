@@ -36,7 +36,7 @@ import rospy
 import naoqi
 
 import smtplib
-from email.mime.text import MIMEText
+import email, email.encoders, email.mime.text, email.mime.base
 
 from naoqi import ( 
     ALModule, 
@@ -56,9 +56,8 @@ from std_srvs.srv import (
     Empty)
     
 #~ nao-ros msgs
-#~ from nao_interaction_msgs.msg import ()
-    
-#~ from nao_interaction_msgs.srv import ()
+from nao_interaction_msgs.srv import (
+    ConnectionMail)
 
 class Constants:
     NODE_NAME = "nao_email_interface"
@@ -77,16 +76,9 @@ class NaoEMailInterface(ALModule, NaoNode):
         self.init_almodule()
 
         self.subscribe()
-        
-        #~ msg = MIMEText("test")
-        #~ msg['Subject'] = "test subject"
-        #~ msg['From'] = "etsardou@gmail.com"
-        #~ msg['To'] = "etsardou@gmail.com"
-        #~ 
-        #~ s = smtplib.SMTP('localhost')
-        #~ s.sendmail(msg['From'], [msg['To']], msg.as_string())
-        #~ s.quit()
-        
+
+        self.sendMailSrv = rospy.Service("nao_connection/send_mail", ConnectionMail, self.sendMail ) 
+
         rospy.loginfo("nao_email_interface initialized")
 
     def init_almodule(self):
@@ -103,6 +95,42 @@ class NaoEMailInterface(ALModule, NaoNode):
         if self.memProxy is None:
             rospy.logerror("Could not get a proxy to ALMemory on %s:%d", self.pip, self.pport)
             exit(1)
+            
+    def sendMail(self, req):
+      
+        #~ Must add checks for empty things
+        username = req.username.data
+        password = req.password.data
+        
+        emailMsg = email.MIMEMultipart.MIMEMultipart('alternative')
+        emailMsg['Subject'] = req.subject.data
+        emailMsg['From'] = req.from_address.data
+        emailMsg['To'] = req.to_address.data
+        
+        # Must check the file extension and add the appropriate mimebase
+        fileMsg = email.mime.base.MIMEBase('audio','x-wav')
+        fileMsg.set_payload(file(req.attachment_file.data).read())
+        fileMsg.add_header('Content-Disposition','attachment;filename=message.wav')
+        email.encoders.encode_base64(fileMsg)
+        emailMsg.attach(fileMsg)
+
+        try:
+            server = smtplib.SMTP(req.server.data)
+            server.ehlo()
+            server.starttls()
+            server.login(username,password)
+            server.sendmail(req.from_address.data, req.to_address.data, emailMsg.as_string())
+        except smtplib.socket.gaierror:
+            return String("Couldn't contact the host")
+        except SMTPAuthenticationError:
+            return String("Login failed")
+        except SomeSendMailError:
+            return String("Couldn't send mail")
+        finally:
+            if server:
+                server.quit()
+                
+        return String("Success")
 
     def shutdown(self): 
         self.unsubscribe()

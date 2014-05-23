@@ -36,6 +36,8 @@ add_service_files(DIRECTORY srv
     AudioRecorder.srv
     AudioMasterVolume.srv
     AudioPlayback.srv
+    #~ nao_connection
+    ConnectionMail.srv
 )
 
 #And now generate the messages
